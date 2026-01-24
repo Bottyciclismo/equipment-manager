@@ -122,7 +122,7 @@ app.use((err, req, res, next) => {
 // INICIAR SERVIDOR
 // =====================================================
 
-app.listen(PORT, HOST, () => {
+app.listen(PORT, () => {
   console.log('\n╔════════════════════════════════════════════════════╗');
   console.log('║   EQUIPMENT MANAGER API - SERVER RUNNING          ║');
   console.log('╚════════════════════════════════════════════════════╝\n');

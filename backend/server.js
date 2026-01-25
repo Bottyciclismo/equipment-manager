@@ -1,90 +1,50 @@
+// ==========================================
+// SERVIDOR PRINCIPAL (server.js)
+// ==========================================
+require('dotenv').config(); // Cargar variables de entorno
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const path = require('path');
-require('dotenv').config();
 
-const authRoutes = require('./routes/index');
-const userRoutes = require('./routes/users');
-const brandRoutes = require('./routes/brands');
-const modelRoutes = require('./routes/models');
-const uploadRoutes = require('./routes/upload');
+// Importamos la configuración de la base de datos
+// (Asegúrate de que la ruta sea correcta. Si lo tienes en 'config', déjalo así)
+try {
+    require('./config/database'); 
+} catch (error) {
+    console.error("⚠️ No se encuentra './config/database', intentando './database/db'...");
+    // Intento alternativo por si acaso lo moviste
+    try { require('./database/db'); } catch(e) { console.log("⚠️ Nota: La BD se conectará cuando se usen las rutas."); }
+}
+
+// Importamos el "Super Gestor" de rutas (tu index.js)
+const mainRoutes = require('./routes/index');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Security middleware
-app.use(helmet());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  credentials: true
-}));
+// ==========================================
+// MIDDLEWARES (Configuraciones previas)
+// ==========================================
+app.use(cors()); // Permite conexiones desde el Frontend
+app.use(express.json()); // Permite leer datos JSON
+app.use(express.urlencoded({ extended: true })); // Permite leer formularios
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100
-});
-app.use('/api/', limiter);
+// ==========================================
+// RUTAS
+// ==========================================
+// Aquí conectamos todas tus rutas bajo el prefijo '/api'
+// Ejemplo: /api/auth/login, /api/brands, etc.
+app.use('/api', mainRoutes);
 
-// Body parser
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Static files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/brands', brandRoutes);
-app.use('/api/models', modelRoutes);
-app.use('/api/upload', uploadRoutes);
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'API is running',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Root endpoint
+// Ruta de prueba simple para saber si el servidor vive
 app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Equipment Manager API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/api/health',
-      auth: '/api/auth/login',
-      brands: '/api/brands',
-      models: '/api/models',
-      users: '/api/users (admin only)',
-      upload: '/api/upload (admin only)'
-    }
-  });
+    res.send('🚀 Servidor funcionando correctamente en Render.');
 });
 
-// Error handler
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Error en el servidor',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
+// ==========================================
+// INICIO DEL SERVIDOR (Configuración Render)
+// ==========================================
+const PORT = process.env.PORT || 5000;
+const HOST = '0.0.0.0'; // <--- IMPRESCINDIBLE PARA RENDER
 
-// Start server
-app.listen(PORT, () => {
-  console.log('\n╔════════════════════════════════════════════════════╗');
-  console.log('║   EQUIPMENT MANAGER API - SERVER RUNNING          ║');
-  console.log('╚════════════════════════════════════════════════════╝\n');
-  console.log(`🚀 Servidor corriendo en puerto: ${PORT}`);
-  console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📁 Uploads: ${path.join(__dirname, 'uploads')}`);
-  console.log(`\n⚠️  Presiona CTRL+C para detener el servidor\n`);
+app.listen(PORT, HOST, () => {
+    console.log(`✅ Servidor corriendo en http://${HOST}:${PORT}`);
 });

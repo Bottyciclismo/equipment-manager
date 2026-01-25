@@ -1,78 +1,57 @@
-// =====================================================
-// EQUIPMENT MANAGER - MAIN SERVER
-// =====================================================
-
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
-// Importar rutas
-const routes = require('./routes');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const brandRoutes = require('./routes/brands');
+const modelRoutes = require('./routes/models');
+const uploadRoutes = require('./routes/upload');
 
-// Inicializar Express
 const app = express();
 const PORT = process.env.PORT || 5000;
-// =====================================================
-// MIDDLEWARE DE SEGURIDAD
-// =====================================================
 
-// Helmet - Headers de seguridad
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
-
-// CORS - Configuración
+// Security middleware
+app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true
 }));
 
-// Rate limiting - Prevenir abuso
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  message: {
-    success: false,
-    message: 'Demasiadas peticiones desde esta IP, intente más tarde.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 15 * 60 * 1000,
+  max: 100
 });
-
 app.use('/api/', limiter);
-
-// =====================================================
-// MIDDLEWARE GENERAL
-// =====================================================
 
 // Body parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Logger
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
-
-// Servir archivos estáticos (uploads)
+// Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// =====================================================
-// RUTAS
-// =====================================================
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/brands', brandRoutes);
+app.use('/api/models', modelRoutes);
+app.use('/api/upload', uploadRoutes);
 
-// API Routes
-app.use('/api', routes);
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API is running',
+    timestamp: new Date().toISOString()
+  });
+});
 
-// Root route
+// Root endpoint
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -89,59 +68,23 @@ app.get('/', (req, res) => {
   });
 });
 
-// =====================================================
-// ERROR HANDLERS
-// =====================================================
-
-// 404 Handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Ruta no encontrada',
-    path: req.originalUrl
-  });
-});
-
-// Error Handler Global
+// Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Error interno del servidor';
-
-  res.status(statusCode).json({
+  res.status(500).json({
     success: false,
-    message: message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message: 'Error en el servidor',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
-// =====================================================
-// INICIAR SERVIDOR
-// =====================================================
-
+// Start server
 app.listen(PORT, () => {
   console.log('\n╔════════════════════════════════════════════════════╗');
   console.log('║   EQUIPMENT MANAGER API - SERVER RUNNING          ║');
   console.log('╚════════════════════════════════════════════════════╝\n');
-  console.log(`🚀 Servidor corriendo en: http://${HOST}:${PORT}`);
+  console.log(`🚀 Servidor corriendo en puerto: ${PORT}`);
   console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📁 Uploads: ${path.join(__dirname, 'uploads')}`);
-  console.log(`\n📚 Documentación de API:`);
-  console.log(`   - Health check: http://${HOST}:${PORT}/api/health`);
-  console.log(`   - Login: POST http://${HOST}:${PORT}/api/auth/login`);
   console.log(`\n⚠️  Presiona CTRL+C para detener el servidor\n`);
 });
-
-// Manejo de cierre graceful
-process.on('SIGTERM', () => {
-  console.log('\n🛑 SIGTERM recibido, cerrando servidor...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('\n🛑 SIGINT recibido, cerrando servidor...');
-  process.exit(0);
-});
-
-module.exports = app;

@@ -1,8 +1,16 @@
 const { Pool } = require('pg');
 
+// Usamos las variables individuales que configuraste en Render
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: false
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 5432,
+  // IMPORTANTE: Render exige SSL, y 'rejectUnauthorized: false' evita errores de certificados
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 pool.on('connect', () => {

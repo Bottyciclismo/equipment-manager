@@ -15,14 +15,7 @@ const routes = require('./routes');
 
 // Inicializar Express
 const app = express();
-<<<<<<< HEAD
-const PORT = process.env.PORT || 0.0.0.0;
-const HOST = process.env.HOST || 'localhost';
-=======
 const PORT = process.env.PORT || 5000;
-const HOST = process.env.HOST || '0.0.0.0';
->>>>>>> 5583dc0b32de8136d056301a8c777b603ccb74e9
-
 // =====================================================
 // MIDDLEWARE DE SEGURIDAD
 // =====================================================

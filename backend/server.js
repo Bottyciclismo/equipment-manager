@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
-const authRoutes = require('./routes/auth');
+const authRoutes = require('./routes/index');
 const userRoutes = require('./routes/users');
 const brandRoutes = require('./routes/brands');
 const modelRoutes = require('./routes/models');

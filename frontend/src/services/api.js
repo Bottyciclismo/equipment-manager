@@ -4,7 +4,8 @@
 
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// FORZAMOS LA DIRECCIÓN CORRECTA (CON LA 'i' Y EL /api)
+const API_URL = 'https://equipment-manager-cci3.onrender.com/api';
 
 // Crear instancia de axios
 const api = axios.create({

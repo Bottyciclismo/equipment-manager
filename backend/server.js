@@ -5,11 +5,11 @@ const { Pool } = require('pg');
 
 const app = express();
 
-// 1. CORS TOTAL (Para evitar bloqueos de Netlify)
+// 1. CORS TOTAL (Permite entrar a Netlify)
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// 2. Base de datos
+// 2. Conexión Base de Datos
 let pool;
 try {
     pool = new Pool({
@@ -18,53 +18,50 @@ try {
     });
 } catch (error) { console.error("Error BD", error); }
 
-// 3. Lógica de Login (La sacamos fuera para reusarla)
-const handleLogin = async (req, res) => {
-    const { username, password } = req.body;
-    console.log(`🔑 Login recibido en ruta: ${req.path} - User: ${username}`);
+// 3. LOG: Para ver en Render qué está llegando
+app.use((req, res, next) => {
+    console.log(`📢 Petición recibida: ${req.method} ${req.url}`);
+    next();
+});
 
-    // USUARIO MAESTRO (Tu llave maestra)
+// 4. LA RUTA EXACTA QUE BUSCA TU FRONTEND
+// Tu api.js envía a: /api/auth/login
+app.post('/api/auth/login', async (req, res) => {
+    const { username, password } = req.body;
+    console.log(`🔑 Login: ${username}`);
+
+    // Login Maestro
     if (username === 'admin' && password === '123456') {
         return res.json({
             success: true,
-            message: 'Login Admin OK',
             token: 'token-maestro',
             user: { id: 1, username: 'admin', role: 'admin' }
         });
     }
-
-    // Intento con BD
+    
+    // Login BD
     try {
         if (pool) {
             const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
             if (result.rows.length > 0) {
-                 // Nota: Aquí falta validar password real, pero para entrar vale
                 return res.json({ success: true, token: 'bd-token', user: result.rows[0] });
             }
         }
     } catch (e) { console.error(e); }
 
-    res.status(401).json({ success: false, message: 'Credenciales mal' });
-};
+    res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+});
 
-// ========================================================
-// 4. EL TRUCO: Escuchar en TODAS las variantes posibles
-// ========================================================
+// 5. RUTA RAÍZ (Diagnóstico)
+app.get('/', (req, res) => {
+    res.send('✅ SERVIDOR ACTIVO - Ruta /api/auth/login esperando...');
+});
 
-// Opción A: Lo estándar
-app.post('/api/auth/login', handleLogin);
-
-// Opción B: Por si Netlify se come el '/api'
-app.post('/auth/login', handleLogin);
-
-// Opción C: Por si hay duplicado '/api/api'
-app.post('/api/api/auth/login', handleLogin);
-
-// Opción D: Ruta raíz del login (Raro, pero por si acaso)
-app.post('/login', handleLogin);
-
-// Ruta de comprobación
-app.get('/', (req, res) => res.send('🚀 SERVIDOR UNIVERSAL (V4) - Escuchando en todas las rutas'));
+// 6. CHIVATO DE ERRORES 404
+// Si llega una petición que no existe, te dirá cuál es
+app.use('*', (req, res) => {
+    res.status(404).send(`❌ Error 404: No encuentro la ruta ${req.originalUrl}`);
+});
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server corriendo en ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Servidor en puerto ${PORT}`));

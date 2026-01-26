@@ -5,62 +5,73 @@ const { Pool } = require('pg');
 
 const app = express();
 
-// Configuración Base de Datos
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-});
+// Configuración Base de Datos (con manejo de errores robusto)
+let pool;
+try {
+    pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+    });
+} catch (error) {
+    console.error("Error configurando BD:", error);
+}
 
-// Configuración CORS (Permite a Netlify entrar)
+// CORS: Permite entrar a TODO el mundo (Vital para Netlify)
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// RUTA DE PRUEBA (Para ver si estás vivo)
-app.get('/', (req, res) => res.send('🚀 Servidor de emergencia ACTIVO.'));
+// LOG: Chivato para ver en Render si llegan las peticiones
+app.use((req, res, next) => {
+    console.log(`📢 Petición recibida: ${req.method} ${req.url}`);
+    next();
+});
 
-// RUTA DE LOGIN (Directa, sin archivos extra)
+// RUTA DE PRUEBA (Para saber si el código nuevo se cargó)
+app.get('/', (req, res) => res.send('🚀 SERVIDOR V3 - LISTO PARA EL COMBATE'));
+
+// RUTA DE LOGIN (La que está fallando ahora mismo)
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
-    console.log(`Intento de login: ${username}`);
-    
-    // Usuario maestro de emergencia (para que puedas entrar SÍ o SÍ)
+    console.log(`🔑 Intento de login de: ${username}`);
+
+    // USUARIO MAESTRO (Para que entres YA)
     if (username === 'admin' && password === '123456') {
         return res.json({
-            token: 'token-falso-de-prueba',
-            user: { id: 1, username: 'admin', role: 'admin' }
+            success: true, // <--- ¡ESTO ES LO QUE LE FALTABA AL FRONTEND!
+            message: 'Login exitoso (Admin Maestro)',
+            token: 'token-maestro-super-secreto',
+            user: { 
+                id: 1, 
+                username: 'admin', 
+                role: 'admin', 
+                email: 'admin@test.com' 
+            }
         });
     }
 
+    // Si no es el admin maestro, intentamos base de datos (si funciona)
     try {
-        // Intentar buscar en base de datos real
-        const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-        if (result.rows.length > 0) {
-            // Aquí iría la comprobación de password real
-            return res.json({ token: 'token-real', user: result.rows[0] });
+        if (pool) {
+            const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+            if (result.rows.length > 0) {
+                 // Aquí en un futuro validarías la contraseña real
+                return res.json({
+                    success: true,
+                    token: 'token-bd-real',
+                    user: result.rows[0]
+                });
+            }
         }
     } catch (e) {
-        console.error(e);
+        console.error("Error BD:", e);
     }
 
-    return res.status(401).json({ message: 'Credenciales inválidas' });
-});
-
-// Inicializar base de datos (TABLA USERS)
-app.get('/api/init-db', async (req, res) => {
-    try {
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                role VARCHAR(20) DEFAULT 'user'
-            );
-        `);
-        res.send('✅ Tabla de usuarios creada.');
-    } catch (e) {
-        res.status(500).send('Error BD: ' + e.message);
-    }
+    // Si falla
+    res.status(401).json({ 
+        success: false, 
+        message: 'Usuario o contraseña incorrectos' 
+    });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server corriendo en puerto ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ Servidor V3 corriendo en puerto ${PORT}`));

@@ -5,80 +5,76 @@ const { Pool } = require('pg');
 
 const app = express();
 
-// 1. Configuración de Base de Datos (Anti-fallos)
+// 1. CONFIGURACIÓN CORS BLINDADA (Para eliminar el error de Netlify)
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Forzamos las cabeceras manualmente por si acaso
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    next();
+});
+
+app.use(express.json());
+
+// 2. BASE DE DATOS
 let pool;
 try {
     pool = new Pool({
         connectionString: process.env.DATABASE_URL,
         ssl: { rejectUnauthorized: false }
     });
-} catch (error) {
-    console.error("⚠️ Error configurando BD:", error);
-}
+} catch (error) { console.error("Error BD", error); }
 
-// 2. CORS Permisivo (Para que Netlify entre sin problemas)
-app.use(cors({ origin: '*' }));
-app.use(express.json());
-
-// 3. LOG: Chivato para ver en Render qué está llegando
-app.use((req, res, next) => {
-    console.log(`📢 Petición recibida: ${req.method} ${req.url}`);
-    next();
-});
-
-// 4. RUTA DE LOGIN (La que te está dando 404)
-// OJO: Definimos la ruta completa '/api/auth/login' para evitar líos
-app.post('/api/auth/login', async (req, res) => {
+// 3. LA LÓGICA DE LOGIN (Función única)
+const handleLogin = async (req, res) => {
     const { username, password } = req.body;
-    console.log(`🔑 Intento de login: ${username}`);
+    console.log(`🔑 INTENTO LOGIN en ruta: ${req.path} - Usuario: ${username}`);
 
-    // --- OPCIÓN A: ADMIN MAESTRO (Para entrar YA) ---
+    // Login Maestro
     if (username === 'admin' && password === '123456') {
-        console.log("✅ Login Maestro exitoso");
         return res.json({
-            success: true,  // <--- ¡ESTO ES LO QUE BUSCABA TU FRONTEND!
-            message: 'Login exitoso',
+            success: true,
+            message: 'Login Admin Maestro OK',
             token: 'token-maestro-super-secreto',
-            user: { 
-                id: 1, 
-                username: 'admin', 
-                role: 'admin' 
-            }
+            user: { id: 1, username: 'admin', role: 'admin' }
         });
     }
 
-    // --- OPCIÓN B: BASE DE DATOS (Si falla el maestro) ---
+    // Login Base de Datos
     try {
         if (pool) {
             const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
             if (result.rows.length > 0) {
-                // Aquí deberías validar la contraseña real con bcrypt en el futuro
-                return res.json({
-                    success: true, // ¡Importante!
-                    token: 'token-bd-real',
-                    user: result.rows[0]
-                });
+                // Aquí iría la validación de pass real
+                return res.json({ success: true, token: 'bd-token', user: result.rows[0] });
             }
         }
-    } catch (e) {
-        console.error("❌ Error BD:", e);
-    }
+    } catch (e) { console.error(e); }
 
-    // Si todo falla
-    console.log("⛔ Fallo de autenticación");
-    res.status(401).json({ 
-        success: false, 
-        message: 'Credenciales inválidas' 
-    });
-});
+    // Fallo
+    res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+};
 
-// 5. RUTA PARA COMPROBAR QUE EL SERVIDOR V3 ESTÁ VIVO
-app.get('/', (req, res) => {
-    res.send('🚀 SERVIDOR V3 ACTIVO - ¡Login listo!');
-});
+// =================================================================
+// 4. LAS RUTAS UNIVERSALES (El truco para que funcione SÍ o SÍ)
+// =================================================================
 
-// Arrancar
+// Opción 1: Lo normal (/api/auth/login)
+app.post('/api/auth/login', handleLogin);
+
+// Opción 2: Por si la variable de Netlify no tiene el /api (/auth/login)
+app.post('/auth/login', handleLogin);
+
+// Opción 3: Por si la variable se duplicó (/api/api/auth/login)
+app.post('/api/api/auth/login', handleLogin);
+
+// Ruta base para confirmar vida
+app.get('/', (req, res) => res.send('🚀 SERVIDOR UNIVERSAL ACTIVO - Escuchando en todas las rutas'));
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ Servidor V3 corriendo en puerto ${PORT}`);
-});
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ Servidor corriendo en puerto ${PORT}`));

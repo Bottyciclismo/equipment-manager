@@ -4,52 +4,76 @@ const cors = require('cors');
 const { Pool } = require('pg');
 
 const app = express();
-
-// 1. CONFIGURACIÓN TOTAL
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// 2. CONEXIÓN BASE DE DATOS
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
 });
 
-// 3. RUTAS DE LOGIN (Ya funcionan)
-const handleLogin = (req, res) => {
+// --- FUNCIÓN MÁGICA: CREA TABLAS Y DATOS SI NO EXISTEN ---
+const inicializarBD = async () => {
+    try {
+        console.log("🛠️ Verificando tablas...");
+        // Creamos la tabla de equipos si no existe
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS equipments (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100),
+                status VARCHAR(50) DEFAULT 'Disponible',
+                description TEXT
+            );
+        `);
+        
+        // Verificamos si está vacía
+        const res = await pool.query('SELECT COUNT(*) FROM equipments');
+        if (parseInt(res.rows[0].count) === 0) {
+            console.log("📝 Insertando datos de prueba...");
+            await pool.query(`
+                INSERT INTO equipments (name, status, description) 
+                VALUES ('Bicicleta Trek Pro', 'Disponible', 'Bici de test'),
+                       ('Casco Specialized', 'En uso', 'Talla M');
+            `);
+        }
+        console.log("✅ Base de datos lista.");
+    } catch (err) {
+        console.error("❌ Error inicializando BD:", err.message);
+    }
+};
+
+inicializarBD(); // Se ejecuta al arrancar el servidor
+
+// --- RUTAS ---
+
+// Login (Maestro)
+app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
-    if (username.toLowerCase() === 'admin' && password === '123456') {
+    if (username?.toLowerCase() === 'admin' && password === '123456') {
         return res.json({
             success: true,
             token: 'token-maestro',
             user: { id: 1, username: 'admin', role: 'admin' }
         });
     }
-    res.status(401).json({ success: false, message: 'Error' });
-};
-app.post('/api/auth/login', handleLogin);
-app.post('/auth/login', handleLogin);
+    res.status(401).json({ success: false, message: 'Credenciales inválidas' });
+});
 
-// 4. RUTAS PARA EL DASHBOARD (Para que no salga la pantalla azul)
-// Estas rutas devuelven una lista vacía en lugar de un error 404
+// Equipos (Para el Dashboard)
 app.get('/api/equipments', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM equipments'); // Cambia 'equipments' por tu tabla real
+        const result = await pool.query('SELECT * FROM equipments ORDER BY id ASC');
         res.json(result.rows);
     } catch (err) {
-        res.json([]); // Si la tabla no existe aún, enviamos lista vacía para que no explote la web
+        res.status(500).json({ error: err.message });
     }
 });
 
-app.get('/api/brands', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM brands');
-        res.json(result.rows);
-    } catch (err) { res.json([]); }
-});
+// Rutas vacías para que no den 404 y no rompan el front
+app.get('/api/brands', (req, res) => res.json([]));
+app.get('/api/models', (req, res) => res.json([]));
 
-// 5. RUTA DE DIAGNÓSTICO
-app.get('/', (req, res) => res.send('🚀 SERVIDOR TOTAL V5 - Dashboard listo'));
+app.get('/', (req, res) => res.send('🚀 Servidor funcionando con Auto-Tablas'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => console.log(`Servidor en puerto ${PORT}`));

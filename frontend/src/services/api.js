@@ -4,8 +4,8 @@
 
 import axios from 'axios';
 
-// FORZAMOS LA DIRECCIÓN CORRECTA (CON LA 'i' Y EL /api)
 const API_URL = 'https://equipment-manager-cci3.onrender.com/api';
+
 
 // Crear instancia de axios
 const api = axios.create({

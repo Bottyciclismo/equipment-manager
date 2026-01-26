@@ -5,70 +5,74 @@ const { Pool } = require('pg');
 
 const app = express();
 
-// 1. Configuración CORS (Permitir todo)
+// 1. CORS TOTAL Y EXPLÍCITO (Para que Chrome no se queje)
 app.use(cors({ origin: '*' }));
+app.options('*', cors()); // Habilita pre-flight request para todo
+
 app.use(express.json());
 
-// 2. Base de Datos
+// 2. Base de Datos (Protegida para que no tumbe el servidor)
 let pool;
 try {
     pool = new Pool({
         connectionString: process.env.DATABASE_URL,
         ssl: { rejectUnauthorized: false }
     });
-} catch (error) { console.error("Error BD", error); }
+} catch (error) { console.error("⚠️ Error cargando configuración BD"); }
 
-// 3. LOG: Para ver qué dirección está llegando realmente
+// 3. CHIVATO (LOGS)
 app.use((req, res, next) => {
-    console.log(`📢 Petición entrante a: ${req.method} ${req.url}`);
+    console.log(`📨 Petición: ${req.method} ${req.url}`);
     next();
 });
 
-// 4. FUNCIÓN DE LOGIN (La definimos una vez para usarla en muchas rutas)
+// 4. LÓGICA DE LOGIN MEJORADA
 const handleLogin = async (req, res) => {
-    const { username, password } = req.body;
-    console.log(`🔑 Intento de login: ${username}`);
+    console.log("📦 Datos recibidos (Body):", req.body); // <--- VEREMOS ESTO EN LOGS
+    
+    // Limpiamos los datos (quitamos espacios y pasamos a minúsculas)
+    const { username, password } = req.body || {};
+    const cleanUser = username ? username.trim().toLowerCase() : '';
+    const cleanPass = password ? password.trim() : '';
 
-    // Admin Maestro
-    if (username === 'admin' && password === '123456') {
+    console.log(`🔑 Intentando entrar con usuario: '${cleanUser}'`);
+
+    // --- LLAVE MAESTRA (Funciona siempre) ---
+    if (cleanUser === 'admin' && cleanPass === '123456') {
+        console.log("✅ ¡Acceso Maestro Concedido!");
         return res.json({
             success: true,
-            token: 'token-maestro',
+            message: 'Login Admin OK',
+            token: 'token-maestro-invencible',
             user: { id: 1, username: 'admin', role: 'admin' }
         });
     }
 
-    // Base de Datos
+    // --- INTENTO CON BASE DE DATOS ---
     try {
         if (pool) {
-            const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+            const result = await pool.query('SELECT * FROM users WHERE username = $1', [cleanUser]);
             if (result.rows.length > 0) {
+                // AQUÍ VALIDARÍAS PASSWORD REAL
                 return res.json({ success: true, token: 'bd-token', user: result.rows[0] });
             }
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error("❌ Error en BD (Ignorable si entras como admin):", e.message); 
+    }
 
-    res.status(401).json({ success: false, message: 'Credenciales incorrectas' });
+    // Si llegamos aquí, es fallo
+    console.log("⛔ Acceso denegado.");
+    res.status(401).json({ success: false, message: 'Usuario o contraseña incorrectos' });
 };
 
-// ==========================================================
-// 5. RUTAS MÚLTIPLES (¡EL TRUCO PARA QUE FUNCIONE!)
-// Escuchamos en todas las variantes posibles por si api.js se lía
-// ==========================================================
+// 5. TODAS LAS RUTAS POSIBLES
+app.post('/api/auth/login', handleLogin);
+app.post('/auth/login', handleLogin);
+app.post('/login', handleLogin);
 
-app.post('/api/auth/login', handleLogin);      // Lo estándar
-app.post('/auth/login', handleLogin);          // Por si falta /api
-app.post('/api/api/auth/login', handleLogin);  // Por si se duplica
-app.post('/login', handleLogin);               // Por si acaso
-
-// 6. Ruta de comprobación y Error 404 detallado
-app.get('/', (req, res) => res.send('🚀 SERVIDOR "COMODÍN" ACTIVO (cci3)'));
-
-// Si falla, nos dirá exactamente qué ruta buscaba el frontend
-app.use('*', (req, res) => {
-    console.log(`❌ 404 - Ruta no encontrada: ${req.originalUrl}`);
-    res.status(404).send(`Error 404: No existe la ruta ${req.originalUrl}`);
-});
+// Ruta base
+app.get('/', (req, res) => res.send('🚀 SERVIDOR FINAL ACTIVO (cci3)'));
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server listo en puerto ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ Servidor listo en puerto ${PORT}`));

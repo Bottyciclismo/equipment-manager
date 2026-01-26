@@ -5,11 +5,11 @@ const { Pool } = require('pg');
 
 const app = express();
 
-// 1. CORS TOTAL (Permite entrar a Netlify)
+// 1. Configuración CORS (Permitir todo)
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// 2. Conexión Base de Datos
+// 2. Base de Datos
 let pool;
 try {
     pool = new Pool({
@@ -18,19 +18,18 @@ try {
     });
 } catch (error) { console.error("Error BD", error); }
 
-// 3. LOG: Para ver en Render qué está llegando
+// 3. LOG: Para ver qué dirección está llegando realmente
 app.use((req, res, next) => {
-    console.log(`📢 Petición recibida: ${req.method} ${req.url}`);
+    console.log(`📢 Petición entrante a: ${req.method} ${req.url}`);
     next();
 });
 
-// 4. LA RUTA EXACTA QUE BUSCA TU FRONTEND
-// Tu api.js envía a: /api/auth/login
-app.post('/api/auth/login', async (req, res) => {
+// 4. FUNCIÓN DE LOGIN (La definimos una vez para usarla en muchas rutas)
+const handleLogin = async (req, res) => {
     const { username, password } = req.body;
-    console.log(`🔑 Login: ${username}`);
+    console.log(`🔑 Intento de login: ${username}`);
 
-    // Login Maestro
+    // Admin Maestro
     if (username === 'admin' && password === '123456') {
         return res.json({
             success: true,
@@ -38,8 +37,8 @@ app.post('/api/auth/login', async (req, res) => {
             user: { id: 1, username: 'admin', role: 'admin' }
         });
     }
-    
-    // Login BD
+
+    // Base de Datos
     try {
         if (pool) {
             const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
@@ -49,19 +48,27 @@ app.post('/api/auth/login', async (req, res) => {
         }
     } catch (e) { console.error(e); }
 
-    res.status(401).json({ success: false, message: 'Credenciales inválidas' });
-});
+    res.status(401).json({ success: false, message: 'Credenciales incorrectas' });
+};
 
-// 5. RUTA RAÍZ (Diagnóstico)
-app.get('/', (req, res) => {
-    res.send('✅ SERVIDOR ACTIVO - Ruta /api/auth/login esperando...');
-});
+// ==========================================================
+// 5. RUTAS MÚLTIPLES (¡EL TRUCO PARA QUE FUNCIONE!)
+// Escuchamos en todas las variantes posibles por si api.js se lía
+// ==========================================================
 
-// 6. CHIVATO DE ERRORES 404
-// Si llega una petición que no existe, te dirá cuál es
+app.post('/api/auth/login', handleLogin);      // Lo estándar
+app.post('/auth/login', handleLogin);          // Por si falta /api
+app.post('/api/api/auth/login', handleLogin);  // Por si se duplica
+app.post('/login', handleLogin);               // Por si acaso
+
+// 6. Ruta de comprobación y Error 404 detallado
+app.get('/', (req, res) => res.send('🚀 SERVIDOR "COMODÍN" ACTIVO (cci3)'));
+
+// Si falla, nos dirá exactamente qué ruta buscaba el frontend
 app.use('*', (req, res) => {
-    res.status(404).send(`❌ Error 404: No encuentro la ruta ${req.originalUrl}`);
+    console.log(`❌ 404 - Ruta no encontrada: ${req.originalUrl}`);
+    res.status(404).send(`Error 404: No existe la ruta ${req.originalUrl}`);
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Servidor en puerto ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`✅ Server listo en puerto ${PORT}`));

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 // IMPORTANTE: Asegúrate de que esta ruta apunta a tu archivo api.js que modificamos antes
-import { authAPI } from '../api/api'; // O '../api/api' según como se llame tu archivo
+import { authAPI } from '../services/api'; // O '../services/api' según como se llame tu archivo
 
 const Login = () => {
   const [formData, setFormData] = useState({ username: '', password: '' });

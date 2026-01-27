@@ -37,7 +37,7 @@ const inicializarTablas = async () => {
             );
         `);
 
-        // Esto crea al usuario admin/123456 si no existe todavía
+        // Crea al usuario admin si no existe
         await pool.query(`
             INSERT INTO users (username, password, role) 
             VALUES ('admin', '123456', 'admin') 
@@ -49,9 +49,10 @@ const inicializarTablas = async () => {
         console.error("❌ Error en inicialización:", err.message);
     }
 };
+
 inicializarTablas();
 
-// --- RUTA DE LOGIN (La que te faltaba) ---
+// --- RUTA DE LOGIN ---
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -65,7 +66,7 @@ app.post('/api/auth/login', async (req, res) => {
             res.json({ 
                 success: true, 
                 user: { id: user.id, username: user.username, role: user.role },
-                token: 'token-falso-de-sesion' // Simulación de token
+                token: 'token-falso-de-sesion' 
             });
         } else {
             res.status(401).json({ success: false, error: "Usuario o contraseña incorrectos" });
@@ -138,4 +139,18 @@ app.post('/api/models', async (req, res) => {
         );
         res.status(201).json({ success: true, data: result.rows[0] });
     } catch (err) {
-        res.status(50
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.delete('/api/models/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM models WHERE id = $1', [req.params.id]);
+        res.json({ success: true, message: "Modelo eliminado" });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`🚀 Servidor en puerto ${PORT}`));

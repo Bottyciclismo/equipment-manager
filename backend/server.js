@@ -14,7 +14,14 @@ const pool = new Pool({
 
 const inicializarTablas = async () => {
     try {
+        // 1. Creamos las tablas (Añadida la de USERS)
         await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(100) NOT NULL,
+                role VARCHAR(20) DEFAULT 'admin'
+            );
             CREATE TABLE IF NOT EXISTS brands (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) UNIQUE NOT NULL,
@@ -30,12 +37,44 @@ const inicializarTablas = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        console.log("✅ Tablas verificadas/creadas");
+
+        // 2. CREAR USUARIO ADMIN AUTOMÁTICO (Para que puedas entrar)
+        await pool.query(`
+            INSERT INTO users (username, password, role) 
+            VALUES ('admin', '123456', 'admin') 
+            ON CONFLICT (username) DO NOTHING
+        `);
+
+        console.log("✅ Tablas y Usuario Admin verificados");
     } catch (err) {
-        console.error("❌ Error al crear tablas:", err.message);
+        console.error("❌ Error en inicialización:", err.message);
     }
 };
 inicializarTablas();
+
+// --- RUTA DE LOGIN (La que te faltaba) ---
+app.post('/api/auth/login', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const result = await pool.query(
+            'SELECT * FROM users WHERE username = $1 AND password = $2',
+            [username, password]
+        );
+
+        if (result.rows.length > 0) {
+            const user = result.rows[0];
+            res.json({ 
+                success: true, 
+                user: { id: user.id, username: user.username, role: user.role },
+                token: 'token-falso-de-sesion' // Simulación de token
+            });
+        } else {
+            res.status(401).json({ success: false, error: "Usuario o contraseña incorrectos" });
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 
 // --- RUTAS DE MARCAS ---
 app.get('/api/brands', async (req, res) => {
@@ -100,18 +139,4 @@ app.post('/api/models', async (req, res) => {
         );
         res.status(201).json({ success: true, data: result.rows[0] });
     } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-app.delete('/api/models/:id', async (req, res) => {
-    try {
-        await pool.query('DELETE FROM models WHERE id = $1', [req.params.id]);
-        res.json({ success: true, message: "Modelo eliminado" });
-    } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
+        res.status(50

@@ -20,34 +20,22 @@ export default function AdminPanel({ onClose }) {
   }, [activeTab]);
 
   const loadData = async () => {
-    setLoading(true);
-    try {
-      let res;
-      if (activeTab === 'users') {
-        res = await usersAPI.getAll();
-        const data = res.data?.data || res.data || [];
-        setUsers(Array.isArray(data) ? data : []);
-      } else if (activeTab === 'brands') {
-        res = await brandsAPI.getAll();
-        const data = res.data?.data || res.data || [];
-        setBrands(Array.isArray(data) ? data : []);
-      } else if (activeTab === 'models') {
-        res = await modelsAPI.getAll();
-        const data = res.data?.data || res.data || [];
-        setModels(Array.isArray(data) ? data : []);
-      } else if (activeTab === 'images') {
-        res = await uploadAPI.listImages();
-        const data = res.data?.data || res.data || [];
-        setImages(Array.isArray(data) ? data : []);
-      }
-    } catch (error) {
-      console.error("Error cargando pestaña:", activeTab, error);
-      showMessage('Error al cargar datos de ' + activeTab, 'error');
-    } finally {
-      setLoading(false);
+  try {
+    if (activeTab === 'brands') {
+      const res = await brandsAPI.getAll();
+      // Esto acepta tanto si viene envuelto en .data.data como si viene directo
+      const data = res.data?.data || res.data || [];
+      setBrands(Array.isArray(data) ? data : []);
+    } else {
+      const res = await modelsAPI.getAll();
+      // CLAVE: Aquí es donde fallaba. Forzamos a que busque la lista de modelos
+      const data = res.data?.data || res.data || [];
+      setModels(Array.isArray(data) ? data : []);
     }
-  };
-
+  } catch (err) {
+    console.error("Error al cargar datos:", err);
+  }
+};
   const showMessage = (text, type = 'success') => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 3000);

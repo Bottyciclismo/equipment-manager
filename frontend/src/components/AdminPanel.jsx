@@ -12,19 +12,26 @@ export default function AdminPanel({ onClose }) {
 
   useEffect(() => { loadData(); }, [activeTab]);
 
-  const loadData = async () => {
+  onst loadData = async () => {
     setLoading(true);
     try {
       const resB = await brandsAPI.getAll();
-      setBrands(resB.data?.data || []);
+      // Buscamos en data.data O en data directamente. Así no se le escapa.
+      const dataMarcas = resB.data?.data || resB.data || [];
+      setBrands(Array.isArray(dataMarcas) ? dataMarcas : []);
       
       if (activeTab === 'models' || activeTab === 'images') {
         const resM = await modelsAPI.getAll();
-        setModels(resM.data?.data || []);
+        // Hacemos lo mismo para los modelos
+        const dataModelos = resM.data?.data || resM.data || [];
+        setModels(Array.isArray(dataModelos) ? dataModelos : []);
       }
-    } catch (error) { console.error(error); }
-    finally { setLoading(false); }
-  };
+    } catch (error) { 
+      console.error("Error cargando:", error); 
+    } finally { 
+      setLoading(false); 
+    }
+  }
 
   const showMessage = (text, type = 'success') => {
     setMessage({ text, type });

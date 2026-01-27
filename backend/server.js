@@ -14,7 +14,6 @@ const pool = new Pool({
 
 const inicializarTablas = async () => {
     try {
-        // 1. Creamos las tablas (Añadida la de USERS)
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -38,7 +37,7 @@ const inicializarTablas = async () => {
             );
         `);
 
-        // 2. CREAR USUARIO ADMIN AUTOMÁTICO (Para que puedas entrar)
+        // Esto crea al usuario admin/123456 si no existe todavía
         await pool.query(`
             INSERT INTO users (username, password, role) 
             VALUES ('admin', '123456', 'admin') 

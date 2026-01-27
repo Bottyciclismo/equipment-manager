@@ -75,23 +75,20 @@ app.delete('/api/brands/:id', async (req, res) => {
     }
 });
 
-// --- RUTAS DE MODELOS ---
-
-// Obtener todos
-app.get('/api/models', async (req, res) => {
+// --- CORRECCIÓN BUSCADOR DE MODELOS ---
+app.get('/api/brands/:brandId/models', async (req, res) => {
     try {
-        const result = await pool.query(`
-            SELECT m.*, b.name as brand_name 
-            FROM models m 
-            JOIN brands b ON m.brand_id = b.id 
-            ORDER BY m.name ASC
-        `);
-        res.json(result.rows);
+        const { brandId } = req.params;
+        const result = await pool.query(
+            'SELECT * FROM models WHERE brand_id = $1 ORDER BY name ASC',
+            [brandId]
+        );
+        // Enviamos los datos envueltos en "data" para que el Frontend no explote
+        res.json({ success: true, data: result.rows });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
-
 // Crear modelo
 app.post('/api/models', async (req, res) => {
     const { brand_id, name, image_url, possible_passwords, reset_instructions } = req.body;

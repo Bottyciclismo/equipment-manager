@@ -218,11 +218,30 @@ export default function Dashboard() {
               </div>
 
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="font-bold text-gray-800 mb-4">Instrucciones de Desbloqueo</h3>
-                <div className="bg-gray-50 p-4 rounded-xl text-gray-600 text-sm leading-relaxed border border-gray-100">
-                  {selectedModel.reset_instructions || "No hay instrucciones específicas para este modelo."}
-                </div>
-              </div>
+  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+    <ImageIcon className="w-5 h-5 text-blue-600" />
+    Instrucciones de Reseteo
+  </h3>
+  
+  <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
+    {selectedModel.reset_instructions ? (
+      <div className="space-y-4">
+        {selectedModel.reset_instructions.split('\n').filter(paso => paso.trim() !== "").map((paso, index) => (
+          <div key={index} className="flex gap-4 items-start">
+            <span className="flex-none bg-blue-100 text-blue-700 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border border-blue-200">
+              {index + 1}
+            </span>
+            <p className="text-gray-700 pt-1 leading-snug">{paso.trim()}</p>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="text-center py-4 text-gray-400 italic">
+        No hay instrucciones de reseteo registradas.
+      </div>
+    )}
+  </div>
+</div>
             </div>
           </div>
         ) : (

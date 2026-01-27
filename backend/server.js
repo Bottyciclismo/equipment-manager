@@ -49,7 +49,19 @@ app.get('/api/brands', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
+app.get('/api/models', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT m.*, b.name as brand_name 
+            FROM models m 
+            LEFT JOIN brands b ON m.brand_id = b.id 
+            ORDER BY m.id DESC
+        `);
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 // Crear marca
 app.post('/api/brands', async (req, res) => {
     const { name } = req.body;

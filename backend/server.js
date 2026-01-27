@@ -86,7 +86,21 @@ app.delete('/api/brands/:id', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
+/ RUTA NECESARIA PARA QUE EL PANEL ADMIN VEA LOS MODELOS
+app.get('/api/models', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT m.*, b.name as brand_name 
+            FROM models m 
+            LEFT JOIN brands b ON m.brand_id = b.id 
+            ORDER BY m.id DESC
+        `);
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        console.error("Error al obtener modelos para admin:", err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 // --- CORRECCIÓN BUSCADOR DE MODELOS ---
 app.get('/api/brands/:brandId/models', async (req, res) => {
     try {

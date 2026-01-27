@@ -3,14 +3,13 @@ import { X, Plus, Edit2, Trash2, Users, Tag, Package, Upload, AlertCircle } from
 import { usersAPI, brandsAPI, modelsAPI, uploadAPI } from '../services/api';
 
 export default function AdminPanel({ onClose }) {
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState('brands'); // Empezamos en marcas que sabemos que funciona
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
 
   const [users, setUsers] = useState([]);
   const [brands, setBrands] = useState([]);
   const [models, setModels] = useState([]);
-  const [images, setImages] = useState([]);
 
   const [editingItem, setEditingItem] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -20,88 +19,66 @@ export default function AdminPanel({ onClose }) {
   }, [activeTab]);
 
   const loadData = async () => {
-    setLoading(true); // 1. Marcamos que estamos cargando
+    setLoading(true);
     try {
       if (activeTab === 'brands') {
         const res = await brandsAPI.getAll();
         const data = res.data?.data || res.data || [];
         setBrands(Array.isArray(data) ? data : []);
-      } 
-      else if (activeTab === 'models') { // 2. Especificamos 'models' claramente
+      } else if (activeTab === 'models') {
         const res = await modelsAPI.getAll();
-        const data = res.data?.data || res.data || [];
+        // SEGURIDAD: Si res.data no existe, ponemos lista vacía
+        const data = res?.data?.data || res?.data || [];
         setModels(Array.isArray(data) ? data : []);
       }
-      else if (activeTab === 'users') { // 3. Por si usas la pestaña de usuarios
-        const res = await usersAPI.getAll();
-        const data = res.data?.data || res.data || [];
-        setUsers(Array.isArray(data) ? data : []);
-      }
-    } catch (err) {
-      console.error("Error al cargar datos en la pestaña " + activeTab, err);
-      // Opcional: mostrar mensaje de error en pantalla
-      // showMessage('No se pudieron cargar los ' + activeTab, 'error');
+    } catch (error) {
+      console.error("Error cargando datos:", error);
+      // Evitamos que explote poniendo listas vacías si hay error
+      setBrands([]);
+      setModels([]);
     } finally {
-      setLoading(false); // 4. Pase lo que pase, quitamos el estado de carga
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (id, type) => {
-    if (!confirm('¿Estás seguro de eliminar este elemento?')) return;
-    try {
-      if (type === 'user') await usersAPI.delete(id);
-      else if (type === 'brand') await brandsAPI.delete(id);
-      else if (type === 'model') await modelsAPI.delete(id);
-      showMessage('Eliminado exitosamente');
-      loadData();
-    } catch (error) {
-      showMessage('Error al eliminar', 'error');
-    }
+  const showMessage = (text, type = 'success') => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 3000);
   };
 
   const tabs = [
-    { id: 'users', label: 'Usuarios', icon: Users },
     { id: 'brands', label: 'Marcas', icon: Tag },
-    { id: 'models', label: 'Modelos', icon: Package },
-    { id: 'images', label: 'Imágenes', icon: Upload }
+    { id: 'models', label: 'Modelos', icon: Package }
   ];
 
   return (
-    <div className="bg-white h-full flex flex-col">
-      {message && (
-        <div className={`p-4 ${message.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" />
-            <span>{message.text}</span>
-          </div>
-        </div>
-      )}
-
-      <div className="border-b flex overflow-x-auto bg-gray-50">
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setShowForm(false); }}
-              className={`px-6 py-4 font-medium flex items-center gap-2 whitespace-nowrap ${
-                activeTab === tab.id ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
-              }`}
-            >
-              <Icon className="w-4 h-4" /> {tab.label}
-            </button>
-          );
-        })}
+    <div className="bg-white h-full flex flex-col min-h-[500px]">
+      {/* Tabs */}
+      <div className="border-b flex bg-gray-50">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => { setActiveTab(tab.id); setShowForm(false); }}
+            className={`px-6 py-4 font-medium flex items-center gap-2 ${
+              activeTab === tab.id ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" /> {tab.label}
+          </button>
+        ))}
       </div>
 
       <div className="flex-1 overflow-auto p-6">
         {loading ? (
-          <div className="text-center py-10">Cargando...</div>
+          <div className="text-center py-10">Cargando datos...</div>
         ) : (
           <>
-            {activeTab === 'users' && <UsersSection users={users} onRefresh={loadData} onDelete={id => handleDelete(id, 'user')} showMessage={showMessage} showForm={showForm} setShowForm={setShowForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
-            {activeTab === 'brands' && <BrandsSection brands={brands} onRefresh={loadData} onDelete={id => handleDelete(id, 'brand')} showMessage={showMessage} showForm={showForm} setShowForm={setShowForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
-            {activeTab === 'models' && <ModelsSection models={models} brands={brands} onRefresh={loadData} onDelete={id => handleDelete(id, 'model')} showMessage={showMessage} showForm={showForm} setShowForm={setShowForm} editingItem={editingItem} setEditingItem={setEditingItem} />}
+            {activeTab === 'brands' && (
+               <BrandsSection brands={brands} onRefresh={loadData} showMessage={showMessage} />
+            )}
+            {activeTab === 'models' && (
+               <ModelsSection models={models} brands={brands} onRefresh={loadData} showMessage={showMessage} />
+            )}
           </>
         )}
       </div>
@@ -109,119 +86,75 @@ export default function AdminPanel({ onClose }) {
   );
 }
 
-// SECCIÓN MARCAS (Corregida para evitar pantalla azul)
-function BrandsSection({ brands, onDelete, onRefresh, showMessage, showForm, setShowForm, editingItem, setEditingItem }) {
+// SECCIÓN MARCAS
+function BrandsSection({ brands, onRefresh, showMessage }) {
   const [name, setName] = useState('');
-  useEffect(() => { if (editingItem) { setName(editingItem.name); setShowForm(true); } }, [editingItem]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (editingItem) await brandsAPI.update(editingItem.id, { name });
-      else await brandsAPI.create({ name });
-      showMessage('Marca guardada');
-      setShowForm(false); setName(''); setEditingItem(null); onRefresh();
-    } catch (e) { showMessage('Error al guardar marca', 'error'); }
+      await brandsAPI.create({ name });
+      showMessage('Marca creada');
+      setName('');
+      onRefresh();
+    } catch (e) { showMessage('Error al guardar', 'error'); }
   };
 
   return (
     <div>
-      <div className="flex justify-between mb-4">
-        <h3 className="font-bold">Listado de Marcas</h3>
-        <button onClick={() => { setShowForm(true); setEditingItem(null); setName(''); }} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nueva</button>
-      </div>
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded mb-4 border">
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre marca" className="border p-2 w-full mb-2" required />
-          <div className="flex gap-2">
-            <button type="submit" className="bg-green-600 text-white px-3 py-1 rounded">Guardar</button>
-            <button type="button" onClick={() => setShowForm(false)} className="bg-gray-400 text-white px-3 py-1 rounded">Cancelar</button>
-          </div>
-        </form>
-      )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        {brands?.length > 0 ? brands.map(b => (
-          <div key={b.id} className="border p-3 rounded flex justify-between bg-white shadow-sm">
+      <form onSubmit={handleSubmit} className="mb-6 flex gap-2">
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Nueva marca..." className="border p-2 rounded flex-1" required />
+        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Añadir</button>
+      </form>
+      <div className="grid gap-2">
+        {brands?.map(b => (
+          <div key={b.id} className="p-3 border rounded bg-gray-50 flex justify-between">
             <span>{b.name}</span>
-            <div className="flex gap-2">
-              <button onClick={() => setEditingItem(b)} className="text-blue-500"><Edit2 className="w-4 h-4" /></button>
-              <button onClick={() => onDelete(b.id)} className="text-red-500"><Trash2 className="w-4 h-4" /></button>
-            </div>
           </div>
-        )) : <p className="text-gray-400">No hay marcas registradas.</p>}
+        ))}
       </div>
     </div>
   );
 }
 
-// SECCIÓN MODELOS (Corregida)
-function ModelsSection({ models, brands, onDelete, onRefresh, showMessage, showForm, setShowForm, editingItem, setEditingItem }) {
-  const [formData, setFormData] = useState({ brand_id: '', name: '', image_url: '', reset_instructions: '', possible_passwords: '' });
-  useEffect(() => { if (editingItem) { setFormData({...editingItem}); setShowForm(true); } }, [editingItem]);
+// SECCIÓN MODELOS (CON PROTECCIÓN ANTI-AZUL)
+function ModelsSection({ models, brands, onRefresh, showMessage }) {
+  const [formData, setFormData] = useState({ brand_id: '', name: '', reset_instructions: '' });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (editingItem) await modelsAPI.update(editingItem.id, formData);
-      else await modelsAPI.create(formData);
-      showMessage('Modelo guardado');
-      setShowForm(false); setEditingItem(null); onRefresh();
-    } catch (e) { showMessage('Error al guardar modelo', 'error'); }
+      await modelsAPI.create(formData);
+      showMessage('Modelo creado');
+      setFormData({ brand_id: '', name: '', reset_instructions: '' });
+      onRefresh();
+    } catch (e) { showMessage('Error al guardar', 'error'); }
   };
 
   return (
     <div>
-      <div className="flex justify-between mb-4">
-        <h3 className="font-bold">Listado de Modelos</h3>
-        <button onClick={() => { setShowForm(true); setEditingItem(null); }} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">+ Nuevo</button>
-      </div>
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-gray-50 p-4 rounded mb-4 border grid grid-cols-1 gap-2">
-          <select value={formData.brand_id} onChange={e => setFormData({...formData, brand_id: e.target.value})} className="border p-2 rounded" required>
-            <option value="">Selecciona Marca</option>
-            {brands?.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-          <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Nombre modelo" className="border p-2 rounded" required />
-          <textarea value={formData.reset_instructions} onChange={e => setFormData({...formData, reset_instructions: e.target.value})} placeholder="Instrucciones" className="border p-2 rounded" />
-          <div className="flex gap-2">
-            <button type="submit" className="bg-green-600 text-white px-3 py-1 rounded">Guardar</button>
-            <button type="button" onClick={() => setShowForm(false)} className="bg-gray-400 text-white px-3 py-1 rounded">Cancelar</button>
-          </div>
-        </form>
-      )}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead><tr className="bg-gray-100 text-xs uppercase"><th className="p-2 border">Marca</th><th className="p-2 border">Modelo</th><th className="p-2 border">Acciones</th></tr></thead>
-          <tbody>
-            {models?.length > 0 ? models.map(m => (
-              <tr key={m.id} className="hover:bg-gray-50">
-                <td className="p-2 border">{m.brand_name || brands.find(b => b.id === m.brand_id)?.name}</td>
-                <td className="p-2 border">{m.name}</td>
-                <td className="p-2 border">
-                   <button onClick={() => setEditingItem(m)} className="text-blue-500 mr-2"><Edit2 className="w-4 h-4 inline"/></button>
-                   <button onClick={() => onDelete(m.id)} className="text-red-500"><Trash2 className="w-4 h-4 inline"/></button>
-                </td>
-              </tr>
-            )) : <tr><td colSpan="3" className="p-4 text-center text-gray-400">No hay modelos.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// SECCIÓN USUARIOS (Simplificada para evitar errores)
-function UsersSection({ users, onDelete, onRefresh, showMessage, showForm, setShowForm, editingItem, setEditingItem }) {
-  return (
-    <div>
-       <h3 className="font-bold mb-4">Gestión de Usuarios</h3>
-       <div className="bg-yellow-50 p-4 border rounded text-sm mb-4">Solo el administrador puede ver y editar usuarios.</div>
-       {users?.map(u => (
-         <div key={u.id} className="p-2 border-b flex justify-between">
-           <span>{u.username} ({u.role})</span>
-           <button onClick={() => onDelete(u.id)} className="text-red-500 text-xs">Eliminar</button>
-         </div>
-       ))}
+      <form onSubmit={handleSubmit} className="mb-6 grid gap-3 bg-gray-50 p-4 rounded border">
+        <select value={formData.brand_id} onChange={e => setFormData({...formData, brand_id: e.target.value})} className="border p-2 rounded" required>
+          <option value="">Selecciona Marca</option>
+          {brands?.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Nombre modelo" className="border p-2 rounded" required />
+        <textarea value={formData.reset_instructions} onChange={e => setFormData({...formData, reset_instructions: e.target.value})} placeholder="Instrucciones..." className="border p-2 rounded" />
+        <button type="submit" className="bg-green-600 text-white py-2 rounded">Guardar Modelo</button>
+      </form>
+      
+      <table className="w-full border-collapse">
+        <thead><tr className="bg-gray-100 text-left"><th className="p-2 border">Marca</th><th className="p-2 border">Modelo</th></tr></thead>
+        <tbody>
+          {models?.length > 0 ? models.map(m => (
+            <tr key={m.id} className="border-b">
+              <td className="p-2 border">{m.brand_name || 'Cargando...'}</td>
+              <td className="p-2 border font-bold">{m.name}</td>
+            </tr>
+          )) : (
+            <tr><td colSpan="2" className="p-4 text-center text-gray-400">No hay modelos todavía.</td></tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }

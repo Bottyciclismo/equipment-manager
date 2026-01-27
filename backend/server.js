@@ -40,28 +40,16 @@ inicializarTablas();
 
 // --- RUTAS DE MARCAS ---
 
-// Obtener todas
+// Obtener todas las marcas
 app.get('/api/brands', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM brands ORDER BY name ASC');
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-app.get('/api/models', async (req, res) => {
-    try {
-        const result = await pool.query(`
-            SELECT m.*, b.name as brand_name 
-            FROM models m 
-            LEFT JOIN brands b ON m.brand_id = b.id 
-            ORDER BY m.id DESC
-        `);
         res.json({ success: true, data: result.rows });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
 });
+
 // Crear marca
 app.post('/api/brands', async (req, res) => {
     const { name } = req.body;
@@ -70,10 +58,9 @@ app.post('/api/brands', async (req, res) => {
             'INSERT INTO brands (name) VALUES ($1) RETURNING *',
             [name]
         );
-        res.status(201).json(result.rows[0]);
+        res.status(201).json({ success: true, data: result.rows[0] });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Error al guardar marca" });
+        res.status(500).json({ success: false, error: "Error al guardar marca" });
     }
 });
 
@@ -81,12 +68,15 @@ app.post('/api/brands', async (req, res) => {
 app.delete('/api/brands/:id', async (req, res) => {
     try {
         await pool.query('DELETE FROM brands WHERE id = $1', [req.params.id]);
-        res.json({ message: "Marca eliminada" });
+        res.json({ success: true, message: "Marca eliminada" });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ success: false, error: err.message });
     }
 });
-/ RUTA NECESARIA PARA QUE EL PANEL ADMIN VEA LOS MODELOS
+
+// --- RUTAS DE MODELOS ---
+
+// Obtener TODOS los modelos (Para el Panel Admin)
 app.get('/api/models', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -97,11 +87,11 @@ app.get('/api/models', async (req, res) => {
         `);
         res.json({ success: true, data: result.rows });
     } catch (err) {
-        console.error("Error al obtener modelos para admin:", err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
-// --- CORRECCIÓN BUSCADOR DE MODELOS ---
+
+// Obtener modelos por MARCA (Para el Buscador del Dashboard)
 app.get('/api/brands/:brandId/models', async (req, res) => {
     try {
         const { brandId } = req.params;
@@ -109,12 +99,12 @@ app.get('/api/brands/:brandId/models', async (req, res) => {
             'SELECT * FROM models WHERE brand_id = $1 ORDER BY name ASC',
             [brandId]
         );
-        // Enviamos los datos envueltos en "data" para que el Frontend no explote
         res.json({ success: true, data: result.rows });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ success: false, error: err.message });
     }
 });
+
 // Crear modelo
 app.post('/api/models', async (req, res) => {
     const { brand_id, name, image_url, possible_passwords, reset_instructions } = req.body;
@@ -123,11 +113,24 @@ app.post('/api/models', async (req, res) => {
             'INSERT INTO models (brand_id, name, image_url, possible_passwords, reset_instructions) VALUES ($1, $2, $3, $4, $5) RETURNING *',
             [brand_id, name, image_url, possible_passwords, reset_instructions]
         );
-        res.status(201).json(result.rows[0]);
+        res.status(201).json({ success: true, data: result.rows[0] });
     } catch (err) {
-        res.status(500).json({ error: "Error al guardar modelo" });
+        res.status(500).json({ success: false, error: "Error al guardar modelo" });
     }
 });
+
+// Eliminar modelo (¡Nueva!)
+app.delete('/api/models/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM models WHERE id = $1', [req.params.id]);
+        res.json({ success: true, message: "Modelo eliminado" });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Ruta de prueba
+app.get('/', (req, res) => res.send('Servidor CCI3 funcionando 🚀'));
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {

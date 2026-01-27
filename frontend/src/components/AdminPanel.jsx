@@ -20,25 +20,30 @@ export default function AdminPanel({ onClose }) {
   }, [activeTab]);
 
   const loadData = async () => {
-  try {
-    if (activeTab === 'brands') {
-      const res = await brandsAPI.getAll();
-      // Esto acepta tanto si viene envuelto en .data.data como si viene directo
-      const data = res.data?.data || res.data || [];
-      setBrands(Array.isArray(data) ? data : []);
-    } else {
-      const res = await modelsAPI.getAll();
-      // CLAVE: Aquí es donde fallaba. Forzamos a que busque la lista de modelos
-      const data = res.data?.data || res.data || [];
-      setModels(Array.isArray(data) ? data : []);
+    setLoading(true); // 1. Marcamos que estamos cargando
+    try {
+      if (activeTab === 'brands') {
+        const res = await brandsAPI.getAll();
+        const data = res.data?.data || res.data || [];
+        setBrands(Array.isArray(data) ? data : []);
+      } 
+      else if (activeTab === 'models') { // 2. Especificamos 'models' claramente
+        const res = await modelsAPI.getAll();
+        const data = res.data?.data || res.data || [];
+        setModels(Array.isArray(data) ? data : []);
+      }
+      else if (activeTab === 'users') { // 3. Por si usas la pestaña de usuarios
+        const res = await usersAPI.getAll();
+        const data = res.data?.data || res.data || [];
+        setUsers(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Error al cargar datos en la pestaña " + activeTab, err);
+      // Opcional: mostrar mensaje de error en pantalla
+      // showMessage('No se pudieron cargar los ' + activeTab, 'error');
+    } finally {
+      setLoading(false); // 4. Pase lo que pase, quitamos el estado de carga
     }
-  } catch (err) {
-    console.error("Error al cargar datos:", err);
-  }
-};
-  const showMessage = (text, type = 'success') => {
-    setMessage({ text, type });
-    setTimeout(() => setMessage(null), 3000);
   };
 
   const handleDelete = async (id, type) => {

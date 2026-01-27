@@ -12,7 +12,7 @@ export default function AdminPanel({ onClose }) {
 
   useEffect(() => { loadData(); }, [activeTab]);
 
-  onst loadData = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
       const resB = await brandsAPI.getAll();

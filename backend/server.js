@@ -1,154 +1,156 @@
-// =====================================================
-// EQUIPMENT MANAGER - MAIN SERVER
-// =====================================================
-
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
-const path = require('path');
+const { Pool } = require('pg');
 require('dotenv').config();
 
-// Importar rutas
-const routes = require('./routes');
-
-// Inicializar Express
 const app = express();
-<<<<<<< HEAD
-const PORT = process.env.PORT || 0.0.0.0;
-const HOST = process.env.HOST || 'localhost';
-=======
-const PORT = process.env.PORT || 5000;
-const HOST = process.env.HOST || '0.0.0.0';
->>>>>>> 5583dc0b32de8136d056301a8c777b603ccb74e9
-
-// =====================================================
-// MIDDLEWARE DE SEGURIDAD
-// =====================================================
-
-// Helmet - Headers de seguridad
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
-
-// CORS - Configuración
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Rate limiting - Prevenir abuso
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  message: {
-    success: false,
-    message: 'Demasiadas peticiones desde esta IP, intente más tarde.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use('/api/', limiter);
-
-// =====================================================
-// MIDDLEWARE GENERAL
-// =====================================================
-
-// Body parser
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
-// Logger
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+});
 
-// Servir archivos estáticos (uploads)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const inicializarTablas = async () => {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(100) NOT NULL,
+                role VARCHAR(20) DEFAULT 'admin'
+            );
+            CREATE TABLE IF NOT EXISTS brands (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS models (
+                id SERIAL PRIMARY KEY,
+                brand_id INTEGER REFERENCES brands(id) ON DELETE CASCADE,
+                name VARCHAR(100) NOT NULL,
+                image_url TEXT,
+                possible_passwords TEXT,
+                reset_instructions TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
 
-// =====================================================
-// RUTAS
-// =====================================================
+        // Crea al usuario admin si no existe
+        await pool.query(`
+            INSERT INTO users (username, password, role) 
+            VALUES ('admin', '123456', 'admin') 
+            ON CONFLICT (username) DO NOTHING
+        `);
 
-// API Routes
-app.use('/api', routes);
-
-// Root route
-app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Equipment Manager API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/api/health',
-      auth: '/api/auth/login',
-      brands: '/api/brands',
-      models: '/api/models',
-      users: '/api/users (admin only)',
-      upload: '/api/upload (admin only)'
+        console.log("✅ Tablas y Usuario Admin verificados");
+    } catch (err) {
+        console.error("❌ Error en inicialización:", err.message);
     }
-  });
+};
+
+inicializarTablas();
+
+// --- RUTA DE LOGIN ---
+app.post('/api/auth/login', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const result = await pool.query(
+            'SELECT * FROM users WHERE username = $1 AND password = $2',
+            [username, password]
+        );
+
+        if (result.rows.length > 0) {
+            const user = result.rows[0];
+            res.json({ 
+                success: true, 
+                user: { id: user.id, username: user.username, role: user.role },
+                token: 'token-falso-de-sesion' 
+            });
+        } else {
+            res.status(401).json({ success: false, error: "Usuario o contraseña incorrectos" });
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
-// =====================================================
-// ERROR HANDLERS
-// =====================================================
-
-// 404 Handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Ruta no encontrada',
-    path: req.originalUrl
-  });
+// --- RUTAS DE MARCAS ---
+app.get('/api/brands', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM brands ORDER BY name ASC');
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
-// Error Handler Global
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Error interno del servidor';
-
-  res.status(statusCode).json({
-    success: false,
-    message: message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
+app.post('/api/brands', async (req, res) => {
+    const { name } = req.body;
+    try {
+        const result = await pool.query('INSERT INTO brands (name) VALUES ($1) RETURNING *', [name]);
+        res.status(201).json({ success: true, data: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
-// =====================================================
-// INICIAR SERVIDOR
-// =====================================================
-
-app.listen(PORT, () => {
-  console.log('\n╔════════════════════════════════════════════════════╗');
-  console.log('║   EQUIPMENT MANAGER API - SERVER RUNNING          ║');
-  console.log('╚════════════════════════════════════════════════════╝\n');
-  console.log(`🚀 Servidor corriendo en: http://${HOST}:${PORT}`);
-  console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📁 Uploads: ${path.join(__dirname, 'uploads')}`);
-  console.log(`\n📚 Documentación de API:`);
-  console.log(`   - Health check: http://${HOST}:${PORT}/api/health`);
-  console.log(`   - Login: POST http://${HOST}:${PORT}/api/auth/login`);
-  console.log(`\n⚠️  Presiona CTRL+C para detener el servidor\n`);
+app.delete('/api/brands/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM brands WHERE id = $1', [req.params.id]);
+        res.json({ success: true, message: "Marca eliminada" });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
-// Manejo de cierre graceful
-process.on('SIGTERM', () => {
-  console.log('\n🛑 SIGTERM recibido, cerrando servidor...');
-  process.exit(0);
+// --- RUTAS DE MODELOS ---
+app.get('/api/models', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT m.*, b.name as brand_name 
+            FROM models m 
+            LEFT JOIN brands b ON m.brand_id = b.id 
+            ORDER BY m.id DESC
+        `);
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
-process.on('SIGINT', () => {
-  console.log('\n🛑 SIGINT recibido, cerrando servidor...');
-  process.exit(0);
+app.get('/api/brands/:brandId/models', async (req, res) => {
+    try {
+        const { brandId } = req.params;
+        const result = await pool.query('SELECT * FROM models WHERE brand_id = $1 ORDER BY name ASC', [brandId]);
+        res.json({ success: true, data: result.rows });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
-module.exports = app;
+app.post('/api/models', async (req, res) => {
+    const { brand_id, name, image_url, possible_passwords, reset_instructions } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO models (brand_id, name, image_url, possible_passwords, reset_instructions) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [brand_id, name, image_url, possible_passwords, reset_instructions]
+        );
+        res.status(201).json({ success: true, data: result.rows[0] });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.delete('/api/models/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM models WHERE id = $1', [req.params.id]);
+        res.json({ success: true, message: "Modelo eliminado" });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`🚀 Servidor en puerto ${PORT}`));

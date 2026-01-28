@@ -1,103 +1,95 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { Lock, User, AlertCircle } from 'lucide-react';
+// IMPORTANTE: Asegúrate de que esta ruta apunta a tu archivo api.js que modificamos antes
+import { authAPI } from '../services/api'; // O '../services/api' según como se llame tu archivo
 
-export default function Login() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+const Login = () => {
+  const [formData, setFormData] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
+    setError('');
 
-    const result = await login(username, password);
-    
-    if (result.success) {
-      navigate('/');
-    } else {
-      setError(result.message);
+    console.log("🚀 Enviando login...", formData);
+
+    try {
+      // 1. Llamamos a la API
+      const response = await authAPI.login(formData);
+      
+      console.log("✅ Respuesta del servidor:", response.data);
+
+      // 2. Verificamos si el servidor dijo "success: true"
+      if (response.data.success) {
+        console.log("🔐 Login autorizado. Guardando datos...");
+        
+        // 3. Guardamos el token y el usuario en el navegador
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+
+        console.log("🎉 Redirigiendo al panel...");
+        
+        // 4. Forzamos la recarga para limpiar errores viejos
+        window.location.href = '/'; 
+      } else {
+        // El servidor respondió, pero dijo "NO"
+        setError(response.data.message || 'Error desconocido en login');
+      }
+
+    } catch (err) {
+      console.error("❌ Error en el Login:", err);
+      // Si el error viene del servidor (ej: 401), mostramos su mensaje
+      if (err.response && err.response.data) {
+        setError(err.response.data.message || 'Usuario o contraseña incorrectos');
+      } else {
+        setError('Error de conexión con el servidor');
+      }
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <div className="inline-block p-3 bg-primary-100 rounded-full mb-4">
-            <Lock className="w-12 h-12 text-primary-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Equipment Manager
-          </h1>
-          <p className="text-gray-600">
-            Inicia sesión para continuar
-          </p>
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
+      <form onSubmit={handleSubmit} style={{ padding: '20px', border: '1px solid #ccc' }}>
+        <h2>Iniciar Sesión</h2>
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+        
+        <div style={{ marginBottom: '10px' }}>
+          <label>Usuario:</label><br/>
+          <input
+            type="text"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            required
+          />
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Usuario
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="input pl-10"
-                placeholder="Ingrese su usuario"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Contraseña
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input pl-10"
-                placeholder="Ingrese su contraseña"
-                required
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary w-full py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-          </button>
-        </form>
-
-        <div className="mt-8 text-center text-sm text-gray-600">
-          <p>Usuario por defecto: <strong>admin</strong></p>
-          <p>Contraseña por defecto: <strong>Admin@2024</strong></p>
+        <div style={{ marginBottom: '10px' }}>
+          <label>Contraseña:</label><br/>
+          <input
+            type="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            required
+          />
         </div>
-      </div>
+
+        <button type="submit" disabled={loading}>
+          {loading ? 'Entrando...' : 'Entrar'}
+        </button>
+      </form>
     </div>
   );
-}
+};
+
+export default Login;

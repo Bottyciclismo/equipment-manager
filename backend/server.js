@@ -1,5 +1,12 @@
 const express = require('express');
 const cors = require('cors');
+
+// Esto permite que tu ordenador (localhost) pueda pedir datos a Render
+app.use(cors({
+  origin: '*', // En desarrollo, esto permite que cualquier origen conecte
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 const { Pool } = require('pg');
 require('dotenv').config();
 
